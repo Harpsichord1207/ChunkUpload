@@ -21,9 +21,10 @@ def upload():
     VirtualFileManager.append(file, chunk_index, offset)
     if VirtualFileManager.check(file.filename, total_chunk):
         total_file = VirtualFileManager.merge(file.filename, total_chunk)
-        with open(file.filename, mode='wb') as fd:
-            total_file.seek(0)
-            fd.write(total_file.read())
+        s3c = boto3.client('s3')
+        # 根据文档: This is a managed transfer which will perform a multipart upload in multiple threads if necessary.
+        s3c.upload_fileobj(total_file, 'cig-test-ningxia', f'derek/{file.filename}')
+        print('Finish upload to s3.')
     return make_response(('ok', 200))
 
 

@@ -35,4 +35,5 @@ class VirtualFileManager:
             for chunk in sorted(file_data, key=lambda c: c['index']):
                 output.seek(chunk['offset'])
                 output.write(chunk['data'])
+            output.seek(0)
             return output
