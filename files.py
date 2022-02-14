@@ -11,7 +11,7 @@ class VirtualFileManager:
     @classmethod
     def append(cls, file_obj, index, offset):
         with lock:
-            if index == 0:
+            if file_obj.filename not in cls._data:
                 cls._data[file_obj.filename] = []
             cls._data[file_obj.filename].append({
                 'data': file_obj.stream.read(),
