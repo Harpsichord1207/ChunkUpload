@@ -73,16 +73,14 @@ class VirtualFile:
         self.current_index = 0
         self.total_index = total_index
         self.parts = []
+        self._upload_running = False
 
     def open_multi_upload(self):
         resp = self.s3client.create_multipart_upload(Bucket='cig-test-ningxia', Key=f'derek/{self.name}')
         self.upload_id = resp['UploadId']
         logger.info(f'Open multipart upload for file {self.name}, upload id = {self.upload_id}')
 
-    def _append(self, index, byte_data):
-        self.data[index] = byte_data
-        logger.info(f'Received Part {index+1} for file {self.name}')
-
+    def _upload(self):
         while self.current_index in self.data:
             bytes_io = BytesIO()
             bytes_io.write(self.data[self.current_index])
@@ -99,18 +97,26 @@ class VirtualFile:
             logger.info(f'Upload Part {self.current_index+1} for file {self.name}')
             self.current_index += 1
 
-        if self.done():
+        if self.all_upload():
             self.s3client.complete_multipart_upload(
                 Bucket='cig-test-ningxia',
                 Key=f'derek/{self.name}',
                 UploadId=self.upload_id,
                 MultipartUpload={'Parts': self.parts}
             )
+            logger.info(f'Finish upload {self.name} to s3')
 
     def append(self, index, byte_data):
-        th = threading.Thread(target=self._append, args=(index, byte_data))
-        th.start()
-        # 并发导致 self.done有问题  self.current_index += 1
+        self.data[index] = byte_data
+        logger.info(f'Received Part {index + 1} for file {self.name}')
+        if not self._upload_running:
+            logger.info(f'Start new thread to upload s3 for file {self.name}')
+            self._upload_running = True
+            th = threading.Thread(target=self._upload)
+            th.start()
 
-    def done(self):
+    def all_received(self):
+        return len(self.data) == self.total_index
+
+    def all_upload(self):
         return self.current_index == self.total_index

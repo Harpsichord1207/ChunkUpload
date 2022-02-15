@@ -1,3 +1,5 @@
+import time
+
 from files import VirtualFileManager, VirtualFile
 from flask import Flask, render_template, make_response, request
 
@@ -34,6 +36,14 @@ def upload2():
     virtual_file = VirtualFileManager.get_virtual_file(file.filename, total_size, total_chunk)
     assert isinstance(virtual_file, VirtualFile)
     virtual_file.append(chunk_index, file.stream.read())
+
+    # 加入此部分逻辑，最后一个chunk会阻塞等上传s3才返回
+    if virtual_file.all_received():
+        while 1:
+            if virtual_file.all_upload():
+                return make_response(('ok', 200))
+            time.sleep(0.1)
+
     return make_response(('ok', 200))
 
 
