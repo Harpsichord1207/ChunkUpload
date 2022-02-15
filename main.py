@@ -1,4 +1,4 @@
-from files import VirtualFileManager
+from files import VirtualFileManager, VirtualFile
 from flask import Flask, render_template, make_response, request
 
 
@@ -12,6 +12,7 @@ def home():
 
 @app.route('/upload', methods=['POST'])
 def upload():
+    print(request.form)
     chunk_index = int(request.form['dzchunkindex'])
     total_chunk = int(request.form['dztotalchunkcount'])
     offset = int(request.form['dzchunkbyteoffset'])
@@ -24,14 +25,15 @@ def upload():
 
 
 @app.route('/upload2', methods=['POST'])
-def upload():
+def upload2():
     # 分片上传到服务器的同时分片上传到S3
-    # TODO TBD
     chunk_index = int(request.form['dzchunkindex'])
+    total_size = int(request.form['dztotalfilesize'])
     total_chunk = int(request.form['dztotalchunkcount'])
-    offset = int(request.form['dzchunkbyteoffset'])
     file = request.files['file']
-    VirtualFileManager.append(file, chunk_index, offset)
+    virtual_file = VirtualFileManager.get_virtual_file(file.filename, total_size, total_chunk)
+    assert isinstance(virtual_file, VirtualFile)
+    virtual_file.append(chunk_index, file.stream.read())
     return make_response(('ok', 200))
 
 
