@@ -41,6 +41,7 @@ def upload2():
     if virtual_file.all_received():
         while 1:
             if virtual_file.all_upload():
+                VirtualFileManager.remove_virtual_file(file.filename, total_size, total_chunk)
                 return make_response(('ok', 200))
             time.sleep(0.1)
 

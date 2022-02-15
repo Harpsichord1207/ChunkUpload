@@ -56,9 +56,17 @@ class VirtualFileManager:
         # 通过文件名和文件体积来确定同一个文件，其实通过md5最好
         key = f'{filename}_{file_total_size}_{total_index}'
         with lock2:
+            # dict操作应该是线程安全的，但不要依赖这一点，加个锁代价很小
             if key not in cls._data2:
                 cls._data2[key] = VirtualFile(filename, total_index)
             return cls._data2[key]
+
+    @classmethod
+    def remove_virtual_file(cls, filename, file_total_size, total_index):
+        key = f'{filename}_{file_total_size}_{total_index}'
+        with lock2:
+            cls._data2.pop(key)
+            logger.info(f'Remove virtual file {filename}')
 
 
 class VirtualFile:
@@ -86,6 +94,8 @@ class VirtualFile:
             bytes_io.write(self.data[self.current_index])
             bytes_io.seek(0)
 
+            logger.info(f'Start to upload Part {self.current_index+1} for file {self.name}')
+
             resp = self.s3client.upload_part(
                 Bucket='cig-test-ningxia',
                 Key=f'derek/{self.name}',
@@ -109,11 +119,12 @@ class VirtualFile:
     def append(self, index, byte_data):
         self.data[index] = byte_data
         logger.info(f'Received Part {index + 1} for file {self.name}')
-        if not self._upload_running:
-            logger.info(f'Start new thread to upload s3 for file {self.name}')
-            self._upload_running = True
-            th = threading.Thread(target=self._upload)
-            th.start()
+        with lock2:
+            # self._upload_running是否线程安全？
+            if not self._upload_running:
+                logger.info(f'Start new thread to upload s3 for file {self.name}')
+                self._upload_running = True
+                threading.Thread(target=self._upload).start()
 
     def all_received(self):
         return len(self.data) == self.total_index
